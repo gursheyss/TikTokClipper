@@ -41,11 +41,6 @@ ex.
   npm install
 ```
 
-### Deploy commands
-```bash
-  node deploy-commands.js
-```
-
 ### Run main.js
 
 ```bash
