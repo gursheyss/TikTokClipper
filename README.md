@@ -4,7 +4,6 @@ A simple script to generate TikTok SFC clips
 
 [Demo](https://youtu.be/NFYAV9OGI9g)
 
-
 ## Installation/Deployment
 
 ### Clone the project
