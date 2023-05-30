@@ -2,6 +2,8 @@
 # TikTokClipper
 A simple script to generate TikTok SFC clips
 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/NFYAV9OGI9g" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
 ## Installation/Deployment
 
 ### Clone the project
