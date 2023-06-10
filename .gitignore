@@ -2,3 +2,5 @@
 /package-lock.json
 /ffmpeg.exe
 /ffprobe.exe
+/output/
+/timestamps.txt

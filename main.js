@@ -1,8 +1,20 @@
 const fs = require('fs')
-const ffmpeg = require('fluent-ffmpeg')
 const readline = require('readline')
-ffmpeg.setFfmpegPath('./ffmpeg.exe')
-ffmpeg.setFfprobePath('./ffprobe.exe')
+const ffmpeg = require('fluent-ffmpeg')
+
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg') //sets up ffmpeg binaries
+const ffprobePath = require('@ffprobe-installer/ffprobe')
+ffmpeg.setFfmpegPath(ffmpegPath.path)
+ffmpeg.setFfprobePath(ffprobePath.path)
+
+if (!fs.existsSync('./output')) {  //file and dir validation
+    fs.mkdirSync('./output')
+}
+if (!fs.existsSync('./timestamps.txt')){
+    fs.writeFileSync('./timestamps.txt','0:00-0:01')
+}
+checkExistence('./video.mp4');
+checkExistence('./gameplay.mp4');
 
 function checkExistence(path, isDirectory = false) {
     if (!fs.existsSync(path)) {
@@ -37,10 +49,6 @@ function convertStamps(timestamp) { // convert timestamps to 00:00:00 format
     return sections.join(':');
 }
 
-checkExistence('./output', true);
-checkExistence('./video.mp4');
-checkExistence('./gameplay.mp4');
-
 const rl = readline.createInterface({
     input: fs.createReadStream('./timestamps.txt'),
 })
@@ -55,7 +63,7 @@ rl.on('line', (line) => {
         const current_index = index++;
         const outputFilename = `./output/video_output_${current_index}.mp4`;
 
-        new Promise((resolve, reject) => {
+        new Promise((resolve, reject) => { //clips video
             ffmpeg('./video.mp4')
                 .seekInput(start)
                 .duration(clipDuration)
@@ -69,81 +77,84 @@ rl.on('line', (line) => {
                     reject(err);
                 }).run();
         })
-            .then(() => {
-                return new Promise((resolve, reject) => {
-                    ffmpeg.ffprobe('./gameplay.mp4', function (err, metadata) {
-                        if (err) {
-                            console.error("Error occurred during probing: " + err);
-                            reject(err);
-                        } else {
-                            let gameplayDuration = metadata.format.duration;
-                            let randomStart = Math.random() * (gameplayDuration - clipDuration);
-                            ffmpeg('./gameplay.mp4')
-                                .noAudio()
-                                .seekInput(randomStart)
-                                .duration(clipDuration)
-                                .output(`./output/gameplay_output_${current_index}.mp4`)
-                                .on('end', function () {
-                                    console.log(`Done: ./output/gameplay_output_${current_index}.mp4`);
-                                    resolve();
-                                })
-                                .on('error', function (err) {
-                                    console.log("Error: " + err);
-                                    reject(err);
-                                }).run();
-                        }
-                    });
+        .then(() => { //randomly clips sections of gameplay
+            return new Promise((resolve, reject) => {
+                ffmpeg.ffprobe('./gameplay.mp4', function (err, metadata) {
+                    if (err) {
+                        console.error("Error occurred during probing: " + err);
+                        reject(err);
+                    } else {
+                        let gameplayDuration = metadata.format.duration;
+                        let randomStart = Math.random() * (gameplayDuration - clipDuration);
+                        ffmpeg('./gameplay.mp4')
+                            .noAudio()
+                            .seekInput(randomStart)
+                            .duration(clipDuration)
+                            .output(`./output/gameplay_output_${current_index}.mp4`)
+                            .on('end', function () {
+                                console.log(`Done: ./output/gameplay_output_${current_index}.mp4`);
+                                resolve();
+                            })
+                            .on('error', function (err) {
+                                console.log("Error: " + err);
+                                reject(err);
+                            }).run();
+                    }
                 });
-            })
-            .then(() => {
-                return new Promise((resolve, reject) => {
-                    ffmpeg()
-                        .input(`./output/video_output_${current_index}.mp4`)
-                        .input(`./output/gameplay_output_${current_index}.mp4`)
-                        .complexFilter([
-                            "[0:v]pad=iw:ih*2[bg]; [bg][1:v]overlay=0:H/2"
-                        ])
-                        .output(`./output/concated_${current_index}.mp4`)
-                        .on('end', function () {
-                            console.log(`Finished concating file ${current_index}`)
-                            resolve();
-                        })
-                        .on('error', function (err) {
-                            console.log("Error: " + err);
-                            reject(err);
-                        }).run();
-                });
-            })
-            .then(() => {
-                return new Promise((resolve, reject) => {
-                    ffmpeg()
-                        .input(`./output/concated_${current_index}.mp4`)
-                        .output(`./output/completed_${current_index}.mp4`)
-                        .addOptions([
-                            '-vf', '[0:v]split=2[blur][vid];[blur]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=luma_radius=min(h\\,w)/20:luma_power=1:chroma_radius=min(cw\\,ch)/20:chroma_power=1[bg];[vid]scale=1080:1920:force_original_aspect_ratio=decrease[ov];[bg][ov]overlay=(W-w)/2:(H-h)/2',
-                        ])
-                        .on('end', function() {
-                            console.log(`Finished finalizing file ${current_index}`);
-                            resolve();
-                        })
-                        .on('error', function(err) {
-                            console.log('An error occurred: ' + err.message);
-                            reject(err);
-                        })
-                        .run();
-                })
-            })
-            .then(() => {
-                return new Promise((resolve) => {
-                    // Delete intermediate files
-                    deleteFile(`./output/video_output_${current_index}.mp4`);
-                    deleteFile(`./output/gameplay_output_${current_index}.mp4`);
-                    deleteFile(`./output/concated_${current_index}.mp4`);
-                    resolve();
-                });
-            })
-            .catch((error) => {
-                console.log('An error occurred: ', error);
             });
+        })
+        .then(() => { //
+            return new Promise((resolve, reject) => {
+                ffmpeg()
+                    .input(`./output/video_output_${current_index}.mp4`)
+                    .input(`./output/gameplay_output_${current_index}.mp4`)
+                    .complexFilter([
+                        "[0:v]pad=iw:ih*2[bg]; [bg][1:v]overlay=0:H/2"
+                    ])
+                    .output(`./output/concated_${current_index}.mp4`)
+                    .on('end', function () {
+                        console.log(`Finished concating file ${current_index}`)
+                        resolve();
+                    })
+                    .on('error', function (err) {
+                        console.log("Error: " + err);
+                        reject(err);
+                    }).run();
+            });
+        })
+        .then(() => {
+            return new Promise((resolve, reject) => {
+                ffmpeg()
+                    .input(`./output/concated_${current_index}.mp4`)
+                    .output(`./output/completed_${current_index}.mp4`)
+                    .addOptions([
+                        '-vf', '[0:v]split=2[blur][vid];' + //splits file into blur and vid stream
+                        '[blur]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=luma_radius=min(h\\,w)/20:luma_power=1:chroma_radius=min(cw\\,ch)/20:chroma_power=1[bg];' + //blur st ream scaled, cropped, and boxblur applied
+                        '[vid]scale=1080:1920:force_original_aspect_ratio=decrease[ov];' + //vid stream scaled
+                        '[bg][ov]overlay=(W-w)/2:(H-h)/2', //add videos on top of eachother
+                    ])
+                    .on('end', function() {
+                        console.log(`Finished finalizing file ${current_index}`);
+                        resolve();
+                    })
+                    .on('error', function(err) {
+                        console.log('An error occurred: ' + err.message);
+                        reject(err);
+                    })
+                    .run();
+            })
+        })
+        .then(() => { //deletes temporary files
+            return new Promise((resolve) => {
+                // Delete intermediate files
+                deleteFile(`./output/video_output_${current_index}.mp4`);
+                deleteFile(`./output/gameplay_output_${current_index}.mp4`);
+                deleteFile(`./output/concated_${current_index}.mp4`);
+                resolve();
+            });
+        })
+        .catch((error) => {
+            console.log('An error occurred: ', error);
+        });
     }
 });
